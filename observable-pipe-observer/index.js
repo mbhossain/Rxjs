@@ -1,90 +1,32 @@
-const { Observable } = require("rxjs");
-const { pluck, map, filter } = require("rxjs/operators");
+const { take, map, combineAll } = require('rxjs/operators');
+const { interval } = require('rxjs');
 
-const users = {
-  data: [
-    {
-      id: 1,
-      status: "active",
-      age: 14,
-    },
-    {
-      id: 1,
-      status: "inactive",
-      age: 12,
-    },
-    {
-      id: 1,
-      status: "active",
-      age: 42,
-    },
-    {
-      id: 1,
-      status: "inactive",
-      age: 42,
-    },
-    {
-      id: 1,
-      status: "active",
-      age: 13,
-    },
-    {
-      id: 1,
-      status: "inactive",
-      age: 75,
-    },
-    {
-      id: 1,
-      status: "inactive",
-      age: 43,
-    },
-    {
-      id: 1,
-      status: "inactive",
-      age: 54,
-    },
-    {
-      id: 1,
-      status: "active",
-      age: 7,
-    },
-    {
-      id: 1,
-      status: "active",
-      age: 17,
-    },
-  ],
-};
+// emit every 1s, take 2
+const source$ = interval(1000).pipe(take(3));
 
-const observable = new Observable((subscriber) => {
-  subscriber.next(users);
-}).pipe(
-  pluck("data"),
-  filter((users) => users.length >= 10),
-  map((users) => {
-    return users.filter((user) => user.status === "active");
-  }),
-  map((users) => {
-    return users.reduce((sum, user) => sum + user.age, 0) / users.length;
-  }),
-  map((average) => {
-    if (average < 18) throw new Error(`Average age is too small (${average})`);
-    else return average;
-  }),
-  map((average) => `The average age is ${average}`)
+// map each emitted value from source to interval observable that takes 5 values
+const example$ = source$.pipe(
+    map(val => interval(500).pipe(map(i => `Result (${val}): ${i}`), take(4)))
 );
 
-const observer = {
-  next: (x) => console.log("Observer got a next value: " + x),
-  error: (err) => console.error("Observer got an error: " + err),
-  complete: () => console.log("Observer got a complete notification"),
-};
-const observer2 = {
-  next: (x) => console.log("Observer 2 got a next value: " + x),
-  error: (err) => console.error("Observer 2 got an error: " + err),
-  complete: () => console.log("Observer 2 got a complete notification"),
-};
+/*
+  2 values from source will map to 2 (inner) interval observables that emit every 1s
+  combineAll uses combineLatest strategy, emitting the last value from each
+  whenever either observable emits a value
+*/
 
-observable.subscribe(observer);
+example$.pipe(combineAll()).subscribe(console.log);
 
-observable.subscribe(observer2);
+/*
+  output:
+  ["Result (0): 0", "Result (1): 0"]
+  ["Result (0): 1", "Result (1): 0"]
+  ["Result (0): 1", "Result (1): 1"]
+  ["Result (0): 2", "Result (1): 1"]
+  ["Result (0): 2", "Result (1): 2"]
+  ["Result (0): 3", "Result (1): 2"]
+  ["Result (0): 3", "Result (1): 3"]
+  ["Result (0): 4", "Result (1): 3"]
+  ["Result (0): 4", "Result (1): 4"]
+*/
+
